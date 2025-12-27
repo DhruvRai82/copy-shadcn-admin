@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -23,7 +24,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { SelectDropdown } from '@/components/select-dropdown'
-import { type Task } from '../data/schema'
+import { type Task } from './tasks-schema'
+import api from '@/lib/api-client'
 
 type TaskMutateDrawerProps = {
   open: boolean
@@ -45,6 +47,7 @@ export function TasksMutateDrawer({
   currentRow,
 }: TaskMutateDrawerProps) {
   const isUpdate = !!currentRow
+  const queryClient = useQueryClient()
 
   const form = useForm<TaskForm>({
     resolver: zodResolver(formSchema),
@@ -56,11 +59,44 @@ export function TasksMutateDrawer({
     },
   })
 
+  const { mutate: createTask, isPending: isCreating } = useMutation({
+    mutationFn: async (data: TaskForm) => {
+      const response = await api.post('/admin/tasks', data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Task created successfully')
+      onOpenChange(false)
+      form.reset()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create task')
+    },
+  })
+
+  const { mutate: updateTask, isPending: isUpdating } = useMutation({
+    mutationFn: async (data: TaskForm) => {
+      const response = await api.patch(`/admin/tasks/${currentRow?.id}`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Task updated successfully')
+      onOpenChange(false)
+      form.reset()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update task')
+    },
+  })
+
   const onSubmit = (data: TaskForm) => {
-    // do something with the form data
-    onOpenChange(false)
-    form.reset()
-    showSubmittedData(data)
+    if (isUpdate) {
+      updateTask(data)
+    } else {
+      createTask(data)
+    }
   }
 
   return (
@@ -111,7 +147,7 @@ export function TasksMutateDrawer({
                     onValueChange={field.onChange}
                     placeholder='Select dropdown'
                     items={[
-                      { label: 'In Progress', value: 'in progress' },
+                      { label: 'In Progress', value: 'in_progress' },
                       { label: 'Backlog', value: 'backlog' },
                       { label: 'Todo', value: 'todo' },
                       { label: 'Canceled', value: 'canceled' },
@@ -202,8 +238,8 @@ export function TasksMutateDrawer({
           <SheetClose asChild>
             <Button variant='outline'>Close</Button>
           </SheetClose>
-          <Button form='tasks-form' type='submit'>
-            Save changes
+          <Button form='tasks-form' type='submit' disabled={isCreating || isUpdating}>
+            {isCreating || isUpdating ? 'Saving...' : 'Save changes'}
           </Button>
         </SheetFooter>
       </SheetContent>

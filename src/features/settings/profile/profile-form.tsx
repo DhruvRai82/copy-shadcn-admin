@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { showSubmittedData } from '@/lib/show-submitted-data'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth-store'
 import {
   Form,
   FormControl,
@@ -48,15 +49,17 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 // This can come from your database or API.
-const defaultValues: Partial<ProfileFormValues> = {
-  bio: 'I own a computer.',
-  urls: [
-    { value: 'https://shadcn.com' },
-    { value: 'http://twitter.com/shadcn' },
-  ],
-}
+
 
 export function ProfileForm() {
+  const { auth } = useAuthStore()
+  const defaultValues: Partial<ProfileFormValues> = {
+    username: auth.user?.email.split('@')[0] || '',
+    email: auth.user?.email || '',
+    bio: 'Admin User',
+    urls: [],
+  }
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues,
@@ -104,9 +107,11 @@ export function ProfileForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value='m@example.com'>m@example.com</SelectItem>
-                  <SelectItem value='m@google.com'>m@google.com</SelectItem>
-                  <SelectItem value='m@support.com'>m@support.com</SelectItem>
+                  {auth.user?.email ? (
+                    <SelectItem value={auth.user.email}>{auth.user.email}</SelectItem>
+                  ) : (
+                    <SelectItem value='placeholder' disabled>No email available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <FormDescription>

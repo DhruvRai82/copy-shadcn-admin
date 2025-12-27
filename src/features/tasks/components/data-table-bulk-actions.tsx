@@ -3,6 +3,7 @@ import { type Table } from '@tanstack/react-table'
 import { Trash2, CircleArrowUp, ArrowUpDown, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { sleep } from '@/lib/utils'
+import api from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,8 +17,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
-import { priorities, statuses } from '../data/data'
-import { type Task } from '../data/schema'
+import { priorities, statuses, type Task } from './tasks-schema'
 import { TasksMultiDeleteDialog } from './tasks-multi-delete-dialog'
 
 type DataTableBulkActionsProps<TData> = {
@@ -30,43 +30,69 @@ export function DataTableBulkActions<TData>({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const selectedRows = table.getFilteredSelectedRowModel().rows
 
-  const handleBulkStatusChange = (status: string) => {
+  const handleBulkStatusChange = async (status: string) => {
     const selectedTasks = selectedRows.map((row) => row.original as Task)
-    toast.promise(sleep(2000), {
-      loading: 'Updating status...',
-      success: () => {
-        table.resetRowSelection()
-        return `Status updated to "${status}" for ${selectedTasks.length} task${selectedTasks.length > 1 ? 's' : ''}.`
-      },
-      error: 'Error',
-    })
-    table.resetRowSelection()
+
+    toast.promise(
+      Promise.all(
+        selectedTasks.map((task) =>
+          api.patch(`/admin/tasks/${task.id}`, { status })
+        )
+      ),
+      {
+        loading: 'Updating status...',
+        success: () => {
+          table.resetRowSelection()
+          return `Status updated to "${status}" for ${selectedTasks.length} task${selectedTasks.length > 1 ? 's' : ''}.`
+        },
+        error: 'Failed to update status',
+      }
+    )
   }
 
-  const handleBulkPriorityChange = (priority: string) => {
+  const handleBulkPriorityChange = async (priority: string) => {
     const selectedTasks = selectedRows.map((row) => row.original as Task)
-    toast.promise(sleep(2000), {
-      loading: 'Updating priority...',
-      success: () => {
-        table.resetRowSelection()
-        return `Priority updated to "${priority}" for ${selectedTasks.length} task${selectedTasks.length > 1 ? 's' : ''}.`
-      },
-      error: 'Error',
-    })
-    table.resetRowSelection()
+
+    toast.promise(
+      Promise.all(
+        selectedTasks.map((task) =>
+          api.patch(`/admin/tasks/${task.id}`, { priority })
+        )
+      ),
+      {
+        loading: 'Updating priority...',
+        success: () => {
+          table.resetRowSelection()
+          return `Priority updated to "${priority}" for ${selectedTasks.length} task${selectedTasks.length > 1 ? 's' : ''}.`
+        },
+        error: 'Failed to update priority',
+      }
+    )
   }
 
   const handleBulkExport = () => {
     const selectedTasks = selectedRows.map((row) => row.original as Task)
-    toast.promise(sleep(2000), {
-      loading: 'Exporting tasks...',
-      success: () => {
-        table.resetRowSelection()
-        return `Exported ${selectedTasks.length} task${selectedTasks.length > 1 ? 's' : ''} to CSV.`
-      },
-      error: 'Error',
-    })
+    if (selectedTasks.length === 0) return
+
+    const headers = ['id', 'title', 'status', 'label', 'priority'];
+    const csvContent = [
+      headers.join(','),
+      ...selectedTasks.map((task: any) =>
+        headers.map(header => JSON.stringify(task[header] || '')).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks-export-selected-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
     table.resetRowSelection()
+    toast.success(`Exported ${selectedTasks.length} tasks`)
   }
 
   return (

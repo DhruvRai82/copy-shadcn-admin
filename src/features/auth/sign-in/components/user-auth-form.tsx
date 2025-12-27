@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
@@ -5,10 +6,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Loader2, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
+import api from '@/lib/api-client'
 import { IconFacebook, IconGithub } from '@/assets/brand-icons'
 import { useAuthStore } from '@/stores/auth-store'
-import { sleep, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
 import {
   Form,
   FormControl,
@@ -51,34 +54,47 @@ export function UserAuthForm({
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
 
-    // Mock successful authentication
-    const mockUser = {
-      accountNo: 'ACC001',
-      email: data.email,
-      role: ['user'],
-      exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
-    }
+    toast.promise(
+      api.post('/auth/login', {
+        email: data.email,
+        password: data.password,
+      }),
+      {
+        loading: 'Signing in...',
+        success: (response: any) => {
+          console.log('[Login] API Response Success:', response)
+          setIsLoading(false)
+          const { user, session } = response.data.data
 
-    toast.promise(sleep(2000), {
-      loading: 'Signing in...',
-      success: () => {
-        setIsLoading(false)
+          // Prepare store user object
+          const authUser = {
+            accountNo: user.id.substring(0, 8),
+            email: user.email,
+            role: [user.user_metadata?.role || 'user'],
+            exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+          }
+          console.log('[Login] Setting Auth User:', authUser)
 
-        // Set user and access token
-        auth.setUser(mockUser)
-        auth.setAccessToken('mock-access-token')
+          // Set user and access token
+          auth.setUser(authUser)
+          auth.setAccessToken(session.access_token)
+          console.log('[Login] Auth State Updated. Navigating to / ...')
 
-        // Redirect to the stored location or default to dashboard
-        const targetPath = redirectTo || '/'
-        navigate({ to: targetPath, replace: true })
+          // Redirect
+          navigate({ to: '/', replace: true })
 
-        return `Welcome back, ${data.email}!`
-      },
-      error: 'Error',
-    })
+          return `Welcome back, ${data.email}!`
+        },
+        error: (err: any) => {
+          console.error('[Login] API Error:', err)
+          setIsLoading(false)
+          return err.response?.data?.message || 'Login failed'
+        },
+      }
+    )
   }
 
   return (
@@ -136,12 +152,29 @@ export function UserAuthForm({
           </div>
         </div>
 
-        <div className='grid grid-cols-2 gap-2'>
-          <Button variant='outline' type='button' disabled={isLoading}>
-            <IconGithub className='h-4 w-4' /> GitHub
-          </Button>
-          <Button variant='outline' type='button' disabled={isLoading}>
-            <IconFacebook className='h-4 w-4' /> Facebook
+        <div className='flex items-center gap-2'>
+          <Button
+            variant='outline'
+            type='button'
+            className='w-full'
+            disabled={isLoading}
+            onClick={async () => {
+              setIsLoading(true)
+              const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                  redirectTo: `${window.location.origin}/`,
+                }
+              })
+              if (error) {
+                toast.error(error.message)
+                setIsLoading(false)
+              }
+            }}
+          >
+            {/* Simple Google Icon SVG */}
+            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+            Google
           </Button>
         </div>
       </form>

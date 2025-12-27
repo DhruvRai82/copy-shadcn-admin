@@ -6,6 +6,17 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: '../', // Read .env from parent directory (bug-binder)
+  server: {
+    port: 5174,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   plugins: [
     tanstackRouter({
       target: 'react',

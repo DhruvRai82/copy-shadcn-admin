@@ -56,6 +56,7 @@ const queryClient = new QueryClient({
           useAuthStore.getState().auth.reset()
           const redirect = `${router.history.location.href}`
           router.navigate({ to: '/sign-in', search: { redirect } })
+          // console.warn('Dev: 401 Unauthorized suppressed to prevent redirect loop.')
         }
         if (error.response?.status === 500) {
           toast.error('Internal Server Error!')

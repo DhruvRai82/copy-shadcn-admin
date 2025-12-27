@@ -13,6 +13,7 @@ import {
   Send,
   Video,
   MessagesSquare,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -26,9 +27,26 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { NewChat } from './components/new-chat'
-import { type ChatUser, type Convo } from './data/chat-types'
-// Fake Data
-import { conversations } from './data/convo.json'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api-client'
+// Types defined locally since data folder is removed
+interface Convo {
+  sender: string
+  message: string
+  timestamp: string | number | Date
+}
+
+interface ChatUser {
+  id: string
+  profile: string
+  username: string
+  fullName: string
+  title: string
+  messages: Convo[]
+}
+
+// Mock data removed
+// const conversations: ChatUser[] = []
 
 export function Chats() {
   const [search, setSearch] = useState('')
@@ -39,14 +57,26 @@ export function Chats() {
   const [createConversationDialogOpened, setCreateConversationDialog] =
     useState(false)
 
+  // Fetch conversations from API
+  const { data: fetchedConversations = [], isLoading } = useQuery({
+    queryKey: ['chats'],
+    queryFn: async () => {
+      const response = await api.get('/admin/chats')
+      return response.data as ChatUser[]
+    },
+  })
+
+  // Normalize data if needed or just use if schema matches
+  const conversations = fetchedConversations
+
   // Filtered data based on the search query
-  const filteredChatList = conversations.filter(({ fullName }) =>
-    fullName.toLowerCase().includes(search.trim().toLowerCase())
+  const filteredChatList = conversations.filter((chat) =>
+    chat.fullName?.toLowerCase().includes(search.trim().toLowerCase())
   )
 
   const currentMessage = selectedUser?.messages.reduce(
-    (acc: Record<string, Convo[]>, obj) => {
-      const key = format(obj.timestamp, 'd MMM, yyyy')
+    (acc: Record<string, Convo[]>, obj: Convo) => {
+      const key = format(new Date(obj.timestamp), 'd MMM, yyyy')
 
       // Create an array for the category if it doesn't exist
       if (!acc[key]) {
@@ -62,6 +92,14 @@ export function Chats() {
   )
 
   const users = conversations.map(({ messages, ...user }) => user)
+
+  if (isLoading) {
+    return (
+      <div className='flex h-full items-center justify-center'>
+        <Loader2 className='size-8 animate-spin text-muted-foreground' />
+      </div>
+    )
+  }
 
   return (
     <>
@@ -246,7 +284,7 @@ export function Chats() {
                                   className={cn(
                                     'text-foreground/75 mt-1 block text-xs font-light italic',
                                     msg.sender === 'You' &&
-                                      'text-primary-foreground/85 text-end'
+                                    'text-primary-foreground/85 text-end'
                                   )}
                                 >
                                   {format(msg.timestamp, 'h:mm a')}

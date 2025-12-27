@@ -79,9 +79,9 @@ export function Dashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-2xl font-bold'>$45,231.89</div>
+                  <div className='text-2xl font-bold'>$0.00</div>
                   <p className='text-muted-foreground text-xs'>
-                    +20.1% from last month
+                    0% from last month
                   </p>
                 </CardContent>
               </Card>
@@ -106,9 +106,9 @@ export function Dashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-2xl font-bold'>+2350</div>
+                  <div className='text-2xl font-bold'>0</div>
                   <p className='text-muted-foreground text-xs'>
-                    +180.1% from last month
+                    0% from last month
                   </p>
                 </CardContent>
               </Card>
@@ -130,9 +130,9 @@ export function Dashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-2xl font-bold'>+12,234</div>
+                  <div className='text-2xl font-bold'>0</div>
                   <p className='text-muted-foreground text-xs'>
-                    +19% from last month
+                    0% from last month
                   </p>
                 </CardContent>
               </Card>
@@ -155,9 +155,9 @@ export function Dashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-2xl font-bold'>+573</div>
+                  <div className='text-2xl font-bold'>0</div>
                   <p className='text-muted-foreground text-xs'>
-                    +201 since last hour
+                    0 since last hour
                   </p>
                 </CardContent>
               </Card>

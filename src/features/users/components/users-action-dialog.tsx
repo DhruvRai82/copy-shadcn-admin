@@ -3,7 +3,8 @@
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,8 +25,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { SelectDropdown } from '@/components/select-dropdown'
-import { roles } from '../data/data'
-import { type User } from '../data/schema'
+import { roles, type User } from './users-schema'
+import api from '@/lib/api-client'
 
 const formSchema = z
   .object({
@@ -105,32 +106,59 @@ export function UsersActionDialog({
   onOpenChange,
 }: UserActionDialogProps) {
   const isEdit = !!currentRow
+  const queryClient = useQueryClient()
+
   const form = useForm<UserForm>({
     resolver: zodResolver(formSchema),
     defaultValues: isEdit
       ? {
-          ...currentRow,
-          password: '',
-          confirmPassword: '',
-          isEdit,
-        }
+        ...currentRow,
+        password: '',
+        confirmPassword: '',
+        isEdit,
+      }
       : {
-          firstName: '',
-          lastName: '',
-          username: '',
-          email: '',
-          role: '',
-          phoneNumber: '',
-          password: '',
-          confirmPassword: '',
-          isEdit,
-        },
+        firstName: '',
+        lastName: '',
+        username: '',
+        email: '',
+        role: '',
+        phoneNumber: '',
+        password: '',
+        confirmPassword: '',
+        isEdit,
+      },
   })
 
+  const { mutate: updateUser, isPending: isUpdating } = useMutation({
+    mutationFn: async (data: UserForm) => {
+      const response = await api.patch(`/admin/users/${currentRow?.id}`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success('User updated successfully')
+      onOpenChange(false)
+      form.reset()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update user')
+    },
+  })
+
+  // Note: Create User not implemented in backend admin-users yet locally for full registration flow (usually requires auth signup), 
+  // but for now we can reuse "invite" or "create" pattern if we had a dedicated create route.
+  // The current UI flow uses this dialog for Add/Edit.
+  // Let's assume Invite is the main way to add users, but if "Add New User" is clicked, we might want to call a create endpoint.
+  // For now I'll wire up Update. If "Add" is used, we might need a separate endpoint or just fallback to Invite.
+
   const onSubmit = (values: UserForm) => {
-    form.reset()
-    showSubmittedData(values)
-    onOpenChange(false)
+    if (isEdit) {
+      updateUser(values)
+    } else {
+      // Placeholder for create logic if needed, or redirect to invite
+      toast.error("Please use 'Invite' to add new users for now.")
+    }
   }
 
   const isPasswordTouched = !!form.formState.dirtyFields.password
@@ -316,8 +344,8 @@ export function UsersActionDialog({
           </Form>
         </div>
         <DialogFooter>
-          <Button type='submit' form='user-form'>
-            Save changes
+          <Button type='submit' form='user-form' disabled={isUpdating}>
+            {isUpdating ? 'Saving...' : 'Save changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

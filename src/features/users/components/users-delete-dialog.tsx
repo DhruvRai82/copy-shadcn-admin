@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { type User } from '../data/schema'
+import { type User } from './users-schema'
+import api from '@/lib/api-client'
 
 type UserDeleteDialogProps = {
   open: boolean
@@ -21,12 +23,27 @@ export function UsersDeleteDialog({
   currentRow,
 }: UserDeleteDialogProps) {
   const [value, setValue] = useState('')
+  const queryClient = useQueryClient()
+
+  const { mutate: deleteUser, isPending } = useMutation({
+    mutationFn: async () => {
+      const response = await api.delete(`/admin/users/${currentRow.id}`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success('User deleted successfully')
+      onOpenChange(false)
+      setValue('')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete user')
+    },
+  })
 
   const handleDelete = () => {
     if (value.trim() !== currentRow.username) return
-
-    onOpenChange(false)
-    showSubmittedData(currentRow, 'The following user has been deleted:')
+    deleteUser()
   }
 
   return (
@@ -34,7 +51,7 @@ export function UsersDeleteDialog({
       open={open}
       onOpenChange={onOpenChange}
       handleConfirm={handleDelete}
-      disabled={value.trim() !== currentRow.username}
+      disabled={value.trim() !== currentRow.username || isPending}
       title={
         <span className='text-destructive'>
           <AlertTriangle
@@ -74,7 +91,7 @@ export function UsersDeleteDialog({
           </Alert>
         </div>
       }
-      confirmText='Delete'
+      confirmText={isPending ? 'Deleting...' : 'Delete'}
       destructive
     />
   )

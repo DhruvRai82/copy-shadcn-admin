@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { type Table } from '@tanstack/react-table'
 import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import { sleep } from '@/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '@/lib/api-client'
 
 type TaskMultiDeleteDialogProps<TData> = {
   open: boolean
@@ -24,27 +25,34 @@ export function TasksMultiDeleteDialog<TData>({
   table,
 }: TaskMultiDeleteDialogProps<TData>) {
   const [value, setValue] = useState('')
+  const queryClient = useQueryClient()
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
+
+  const { mutate: deleteTasks, isPending } = useMutation({
+    mutationFn: async () => {
+      await Promise.all(
+        selectedRows.map((row) => api.delete(`/admin/tasks/${(row.original as any).id}`))
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      table.resetRowSelection()
+      onOpenChange(false)
+      toast.success(`Deleted ${selectedRows.length} tasks`)
+      setValue('')
+    },
+    onError: () => {
+      toast.error('Failed to delete tasks')
+    }
+  })
 
   const handleDelete = () => {
     if (value.trim() !== CONFIRM_WORD) {
       toast.error(`Please type "${CONFIRM_WORD}" to confirm.`)
       return
     }
-
-    onOpenChange(false)
-
-    toast.promise(sleep(2000), {
-      loading: 'Deleting tasks...',
-      success: () => {
-        table.resetRowSelection()
-        return `Deleted ${selectedRows.length} ${
-          selectedRows.length > 1 ? 'tasks' : 'task'
-        }`
-      },
-      error: 'Error',
-    })
+    deleteTasks()
   }
 
   return (

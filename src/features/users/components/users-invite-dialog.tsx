@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { MailPlus, Send } from 'lucide-react'
-import { showSubmittedData } from '@/lib/show-submitted-data'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,7 +25,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SelectDropdown } from '@/components/select-dropdown'
-import { roles } from '../data/data'
+import { roles } from './users-schema'
+import api from '@/lib/api-client'
 
 const formSchema = z.object({
   email: z.email({
@@ -46,15 +48,30 @@ export function UsersInviteDialog({
   open,
   onOpenChange,
 }: UserInviteDialogProps) {
+  const queryClient = useQueryClient()
   const form = useForm<UserInviteForm>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: '', role: '', desc: '' },
   })
 
+  const { mutate: inviteUser, isPending } = useMutation({
+    mutationFn: async (data: UserInviteForm) => {
+      const response = await api.post('/admin/users/invite', data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success('User invited successfully')
+      onOpenChange(false)
+      form.reset()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to invite user')
+    },
+  })
+
   const onSubmit = (values: UserInviteForm) => {
-    form.reset()
-    showSubmittedData(values)
-    onOpenChange(false)
+    inviteUser(values)
   }
 
   return (
@@ -140,7 +157,7 @@ export function UsersInviteDialog({
           <DialogClose asChild>
             <Button variant='outline'>Cancel</Button>
           </DialogClose>
-          <Button type='submit' form='user-invite-form'>
+          <Button type='submit' form='user-invite-form' disabled={isPending}>
             Invite <Send />
           </Button>
         </DialogFooter>
